@@ -142,7 +142,6 @@ Possible future improvements include:
 
 Bachelors in Artificial Intelligence Student
 
-GitHub: `sfaizyab2006`
 
 ## Disclaimer
 
