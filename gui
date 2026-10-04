@@ -543,9 +543,20 @@ class SmartStudyPlannerGUI:
             self.subject_name = subject
             self.exam_date = date
 
+            days_until_exam = (exam_date - today).days
+            success_message = "Subject information saved successfully."
+
+            if days_until_exam > 365:
+                success_message += "\n\nYour Exam Is Far Away. Relax!!"
+            elif days_until_exam < 60:
+                success_message += (
+                    "\n\nYou Have Less Than 60 Days Until Your Exam. "
+                    "Start Studying!!"
+                )
+
             messagebox.showinfo(
                 "Success",
-                "Subject information saved successfully."
+                success_message
             )
 
             self.show_dashboard()
@@ -573,7 +584,7 @@ class SmartStudyPlannerGUI:
 
         input_frame = ttk.LabelFrame(
             self.main_area,
-            text="Add New Topic",
+            text="Add or Edit Topic",
             padding=20
         )
 
@@ -631,8 +642,8 @@ class SmartStudyPlannerGUI:
             input_frame,
             text="Difficulty"
         ).grid(
-            row=0,
-            column=4,
+            row=1,
+            column=0,
             padx=5,
             pady=5
         )
@@ -645,8 +656,8 @@ class SmartStudyPlannerGUI:
         )
 
         difficulty_box.grid(
-            row=0,
-            column=5,
+            row=1,
+            column=1,
             padx=5,
             pady=5
         )
@@ -657,8 +668,8 @@ class SmartStudyPlannerGUI:
             input_frame,
             text="Confidence"
         ).grid(
-            row=0,
-            column=6,
+            row=1,
+            column=2,
             padx=5,
             pady=5
         )
@@ -671,8 +682,8 @@ class SmartStudyPlannerGUI:
         )
 
         confidence_box.grid(
-            row=0,
-            column=7,
+            row=1,
+            column=3,
             padx=5,
             pady=5
         )
@@ -738,6 +749,8 @@ class SmartStudyPlannerGUI:
             expand=True
         )
 
+        editing_topic = None
+
         def refresh_tree():
 
             for item in tree.get_children():
@@ -758,6 +771,8 @@ class SmartStudyPlannerGUI:
 
         def add_topic():
 
+            nonlocal editing_topic
+
             name = topic_entry.get().strip()
 
             if not name:
@@ -776,7 +791,10 @@ class SmartStudyPlannerGUI:
 
             for topic in self.topics:
 
-                if topic["name"].upper() == name.upper():
+                if (
+                    topic is not editing_topic
+                    and topic["name"].upper() == name.upper()
+                ):
 
                     messagebox.showerror(
                         "Duplicate Topic",
@@ -816,15 +834,28 @@ class SmartStudyPlannerGUI:
                 confidence_box.get()
             )
 
-            self.topics.append(
-                {
-                    "name": name.upper(),
-                    "hours": hours,
-                    "difficulty": difficulty,
-                    "confidence": confidence,
-                    "studied": 0
-                }
-            )
+            if editing_topic is None:
+                self.topics.append(
+                    {
+                        "name": name.upper(),
+                        "hours": hours,
+                        "difficulty": difficulty,
+                        "confidence": confidence,
+                        "studied": 0
+                    }
+                )
+            else:
+                editing_topic.update(
+                    {
+                        "name": name.upper(),
+                        "hours": hours,
+                        "difficulty": difficulty,
+                        "confidence": confidence,
+                        "studied": min(editing_topic["studied"], hours)
+                    }
+                )
+                editing_topic = None
+                add_button.config(text="Add Topic")
 
             topic_entry.delete(
                 0,
@@ -838,7 +869,37 @@ class SmartStudyPlannerGUI:
 
             refresh_tree()
 
+        def edit_topic():
+
+            nonlocal editing_topic
+
+            selected = tree.selection()
+
+            if not selected:
+                messagebox.showwarning(
+                    "No Selection",
+                    "Please select a topic first."
+                )
+                return
+
+            topic_name = tree.item(selected[0])["values"][0]
+            editing_topic = next(
+                topic
+                for topic in self.topics
+                if topic["name"] == topic_name
+            )
+
+            topic_entry.delete(0, tk.END)
+            topic_entry.insert(0, editing_topic["name"])
+            hours_entry.delete(0, tk.END)
+            hours_entry.insert(0, str(editing_topic["hours"]))
+            difficulty_box.set(editing_topic["difficulty"])
+            confidence_box.set(editing_topic["confidence"])
+            add_button.config(text="Save Changes")
+
         def delete_topic():
+
+            nonlocal editing_topic
 
             selected = tree.selection()
 
@@ -863,6 +924,18 @@ class SmartStudyPlannerGUI:
                 if topic["name"] != topic_name
             ]
 
+            if (
+                editing_topic is not None
+                and editing_topic["name"] == topic_name
+            ):
+                editing_topic = None
+                add_button.config(text="Add Topic")
+
+                topic_entry.delete(0, tk.END)
+                hours_entry.delete(0, tk.END)
+                difficulty_box.set(3)
+                confidence_box.set(3)
+
             refresh_tree()
 
         button_frame = ttk.Frame(
@@ -875,10 +948,20 @@ class SmartStudyPlannerGUI:
             pady=(0, 20)
         )
 
-        ttk.Button(
+        add_button = ttk.Button(
             button_frame,
             text="Add Topic",
             command=add_topic
+        )
+        add_button.pack(
+            side="left",
+            padx=5
+        )
+
+        ttk.Button(
+            button_frame,
+            text="Edit Selected",
+            command=edit_topic
         ).pack(
             side="left",
             padx=5
